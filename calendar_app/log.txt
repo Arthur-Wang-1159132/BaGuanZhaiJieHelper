@@ -1,0 +1,4 @@
+2025-04-14 19:09:31,415 - INFO - Starting synchronization...
+2025-04-14 19:09:33,215 - INFO - current blobs in source: 2024-11-01.log.csv, last_modified: 2025-04-14 07:09:25+00:00, content_type: text/csv
+2025-04-14 19:09:36,157 - ERROR - Error, resources/2024-11-01.log.csv , getting maximum recursion depth exceeded 
+
