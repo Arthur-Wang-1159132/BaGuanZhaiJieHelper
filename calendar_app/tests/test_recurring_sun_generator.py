@@ -39,6 +39,16 @@ def test_weekday_rule():
     assert gen.dates_by_weekday_rule(6, 6, 'second') == [date(2026, 6, 14)]
 
 
+def test_lunar_two_fast_days():
+    dates = make().dates_by_lunar_fast_days('two')
+    for d in dates:
+        assert LunarDate.from_solar_date(d.year, d.month, d.day).day in {1, 15}
+    # 2026 年正月初一、十五
+    assert date(2026, 2, 17) in dates and date(2026, 3, 3) in dates
+    # 每个农历月 2 天，2026 年包含 12 或 13 个农历月的初一和十五
+    assert 23 <= len(dates) <= 26
+
+
 def test_lunar_fast_days_rule():
     assert lunar_fast_days('six', 30) == {8, 14, 15, 23, 29, 30}
     assert lunar_fast_days('six', 29) == {8, 14, 15, 23, 28, 29}

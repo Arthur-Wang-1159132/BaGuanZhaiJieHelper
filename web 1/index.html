@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>八关斋戒日历</title>
+  <meta name="description" content="生成八关斋戒日历（.ics），从日出到次日日出，含日中过午不食提醒，可导入手机日历。">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='7' fill='%23c2410c'/%3E%3Cg stroke='%23c2410c' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M16 2v4M16 26v4M2 16h4M26 16h4M6 6l3 3M23 23l3 3M6 26l3-3M23 9l3-3'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="page">
+    <header class="masthead">
+      <h1>八关斋戒日历</h1>
+      <p class="lede">从<strong>日出</strong>到<strong>次日日出</strong>。按农历、藏历斋日规则，或在日历上点选日期，在所选地点计算日出、日中、日落，生成 <code>.ics</code> 日历文件，导入手机或电脑日历即可收到提醒。</p>
+    </header>
+
+    <form id="form" class="panel" novalidate>
+      <section class="group">
+        <h2>日期规则</h2>
+        <div class="grid">
+          <label class="field">
+            <span>开始年份</span>
+            <input id="startYear" type="number" min="1901" max="2099" inputmode="numeric">
+          </label>
+          <label class="field">
+            <span>结束年份</span>
+            <input id="endYear" type="number" min="1901" max="2099" inputmode="numeric">
+          </label>
+          <label class="field span-full">
+            <span>重复规则</span>
+            <select id="rule">
+              <option value="lunar">农历斋日（六斋日 / 十斋日）</option>
+              <option value="tibetan">藏历斋日</option>
+              <option value="monthly">每月的第几天</option>
+              <option value="quarter">每季度（第一天或最后一天）</option>
+              <option value="weekday">某月的第几个星期几</option>
+            </select>
+          </label>
+
+          <label class="field" data-rule="lunar">
+            <span>斋日</span>
+            <select id="lunarType">
+              <option value="six">六斋日</option>
+              <option value="ten">十斋日</option>
+            </select>
+          </label>
+          <p class="hint span-full" data-rule="lunar" id="lunarHint"></p>
+
+          <fieldset class="span-full choice-group" data-rule="tibetan">
+            <legend>每月</legend>
+            <label class="check"><input type="checkbox" name="tibetanDay" value="d8" checked> 初八 药师佛日</label>
+            <label class="check"><input type="checkbox" name="tibetanDay" value="d15" checked> 十五 阿弥陀佛日</label>
+            <label class="check"><input type="checkbox" name="tibetanDay" value="d30" checked> 三十 释迦牟尼佛日</label>
+            <label class="check"><input type="checkbox" name="tibetanDay" value="d10"> 初十 莲师荟供日</label>
+            <label class="check"><input type="checkbox" name="tibetanDay" value="d25"> 廿五 空行母荟供日</label>
+          </fieldset>
+          <fieldset class="span-full choice-group" data-rule="tibetan">
+            <legend>每年</legend>
+            <label class="check"><input type="checkbox" id="tibetanFestivals"> 四大节日</label>
+            <label class="check"><input type="checkbox" id="tibetanSagaDawa"> 整个萨嘎达瓦月（四月）</label>
+          </fieldset>
+          <p class="hint span-full" data-rule="tibetan">按时轮历浦派（Phugpa）计算。四大节日：神变节（正月十五）、萨嘎达瓦节（四月十五）、转法轮节（六月初四）、天降节（九月廿二）。同一日子出现两天（重日）时取第二天；当月缺某日时提前一天。</p>
+
+          <label class="field" data-rule="monthly">
+            <span>日（1-31）</span>
+            <input id="monthDay" type="number" min="1" max="31" value="1" inputmode="numeric">
+          </label>
+          <p class="hint span-full" data-rule="monthly">不存在的日期（如 2 月 30 日）会自动跳过。</p>
+
+          <label class="field" data-rule="quarter">
+            <span>哪一天</span>
+            <select id="quarterWhich">
+              <option value="first">第一天</option>
+              <option value="last">最后一天</option>
+            </select>
+          </label>
+
+          <label class="field" data-rule="weekday">
+            <span>月份</span>
+            <select id="weekdayMonth"></select>
+          </label>
+          <label class="field" data-rule="weekday">
+            <span>第几个</span>
+            <select id="weekdayWhich">
+              <option value="first">第一个</option>
+              <option value="second">第二个</option>
+              <option value="third">第三个</option>
+              <option value="fourth">第四个</option>
+              <option value="last" selected>最后一个</option>
+            </select>
+          </label>
+          <label class="field" data-rule="weekday">
+            <span>星期</span>
+            <select id="weekdayDay"></select>
+          </label>
+        </div>
+      </section>
+
+      <section class="group">
+        <div class="group-head">
+          <h2>地点</h2>
+          <div class="actions-inline">
+            <button type="button" class="link" id="useLocation">使用当前位置</button>
+            <button type="button" class="link" id="resetLocation">恢复默认</button>
+          </div>
+        </div>
+        <div class="grid">
+          <label class="field span-2">
+            <span>名称</span>
+            <input id="placeName" type="text" autocomplete="off">
+          </label>
+          <label class="field">
+            <span>纬度（南为负）</span>
+            <input id="latitude" type="number" step="any" min="-90" max="90" inputmode="decimal">
+          </label>
+          <label class="field">
+            <span>经度（西为负）</span>
+            <input id="longitude" type="number" step="any" min="-180" max="180" inputmode="decimal">
+          </label>
+          <label class="field span-2">
+            <span>时区（IANA 名称，如 Asia/Shanghai）</span>
+            <input id="timezone" type="text" autocomplete="off" spellcheck="false" list="timezones">
+            <datalist id="timezones"></datalist>
+          </label>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2>提醒</h2>
+        <div class="checks">
+          <span class="checks-label">日出前</span>
+          <label class="check"><input type="checkbox" name="reminder" value="24" checked> 24 小时</label>
+          <label class="check"><input type="checkbox" name="reminder" value="12" checked> 12 小时</label>
+          <label class="check"><input type="checkbox" name="reminder" value="1" checked> 1 小时</label>
+        </div>
+        <div class="checks">
+          <label class="check"><input type="checkbox" id="noonReminder" checked> 日中前（过午不食）</label>
+          <label class="inline-number">
+            提前 <input id="noonMinutes" type="number" min="0" max="240" value="30" inputmode="numeric"> 分钟
+          </label>
+        </div>
+      </section>
+
+      <section class="group">
+        <div class="group-head">
+          <h2>手动选择日期</h2>
+          <span class="hint">点击日期加入或移出列表</span>
+        </div>
+        <div id="calendar" class="calendar"></div>
+        <ul class="cal-legend" aria-label="图例">
+          <li><span class="swatch swatch-fast">斋</span>适合受持八关斋戒</li>
+          <li><span class="swatch swatch-festival">节</span>佛教节日</li>
+          <li><span class="swatch swatch-saga"></span>萨嘎达瓦月</li>
+          <li><span class="swatch swatch-rule"></span>规则日期</li>
+          <li><span class="swatch swatch-selected"></span>已选</li>
+        </ul>
+        <div id="dayDetail" class="day-detail" hidden></div>
+
+        <div class="picked-head">
+          <h3>已选日期 <span id="pickedCount" class="count">0</span></h3>
+          <button type="button" class="link" id="clearPicked">清空</button>
+        </div>
+        <ul id="pickedList" class="picked-list"></ul>
+        <p id="pickedEmpty" class="hint">尚未选择日期。</p>
+      </section>
+
+      <section class="group">
+        <h2>生成内容</h2>
+        <div class="checks">
+          <label class="check"><input type="checkbox" id="includeRule" checked> 规则日期</label>
+          <label class="check"><input type="checkbox" id="includeManual" checked> 手动选择的日期</label>
+        </div>
+        <p class="hint">两者同时勾选时会合并去重。每个事件的描述中会写明当天的农历、藏历和殊胜日。</p>
+      </section>
+
+      <div id="error" class="error" role="alert" hidden></div>
+
+      <div class="actions">
+        <button type="button" class="secondary" id="previewButton">预览日期</button>
+        <button type="submit" class="primary" id="downloadButton">下载 .ics 日历</button>
+      </div>
+    </form>
+
+    <section id="results" class="panel results" hidden aria-live="polite">
+      <div class="results-head">
+        <h2>预览</h2>
+        <p id="summary" class="summary"></p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>日期</th><th>星期</th><th>农历</th><th>藏历</th><th>日出</th><th>日中</th><th>日落</th><th>殊胜日</th></tr>
+          </thead>
+          <tbody id="previewBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="footnote">
+      <p>太阳时间采用 NOAA 算法，与实际可能有 ±1 分钟左右的差异（受海拔、地形影响）。每个事件的 UID 由日期决定，重新导入时日历会更新原有事件而不会重复。所有计算都在浏览器中完成，不会上传任何数据。</p>
+    </footer>
+  </main>
+
+  <script src="js/vendor/date-tibetan.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/calendar-view.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

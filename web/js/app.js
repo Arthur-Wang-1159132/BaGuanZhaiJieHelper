@@ -8,15 +8,17 @@
   const $ = (id) => document.getElementById(id);
 
   const LUNAR_HINTS = {
+    two: '每月初一（朔）、十五（望），闰月同样计算。',
+    custom: '勾选要守戒的农历日子，闰月同样计算。选「三十」时，小月（29 天）改在廿九。',
     six: '初八、十四、十五、廿三、廿九、三十（小月为廿八、廿九），闰月同样计算。',
     ten: '初一、初八、十四、十五、十八、廿三、廿四、廿八、廿九、三十（小月为廿七、廿八、廿九），闰月同样计算。',
   };
 
   const fields = ['rule', 'lunarType', 'monthDay', 'quarterWhich', 'weekdayMonth', 'weekdayWhich', 'weekdayDay',
-    'tibetanFestivals', 'tibetanSagaDawa', 'includeRule', 'includeManual',
+    'tibetanFestivals', 'tibetanSagaDawa', 'includeRule', 'includeManual', 'includeRitual', 'ritualName', 'ritualText',
     'startYear', 'endYear', 'placeName', 'latitude', 'longitude', 'timezone', 'noonReminder', 'noonMinutes'];
   // 多选框组：保存为选中值的数组
-  const checkboxGroups = ['reminder', 'tibetanDay'];
+  const checkboxGroups = ['reminder', 'tibetanDay', 'lunarDay'];
   const checkedValues = (name) => [...document.querySelectorAll(`input[name="${name}"]:checked`)].map((x) => x.value);
 
   /** 在月历上手动选择的日期（dateKey） */
@@ -33,6 +35,19 @@
 
   fillSelect($('weekdayMonth'), Array.from({ length: 12 }, (_, i) => `${i + 1} 月`), 1, 6);
   fillSelect($('weekdayDay'), B.WEEKDAY_NAMES, 0, 6);
+
+  // 自定义农历日子：初一到三十，默认勾选初一、十五
+  $('lunarDayGrid').append(...B.LUNAR_DAY_NAMES.map((name, i) => {
+    const label = document.createElement('label');
+    label.className = 'check';
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.name = 'lunarDay';
+    box.value = String(i + 1);
+    box.checked = i === 0 || i === 14;
+    label.append(box, ` ${name}`);
+    return label;
+  }));
 
   if (typeof Intl.supportedValuesOf === 'function') {
     const list = $('timezones');
@@ -51,6 +66,7 @@
     $('startYear').value = year;
     $('endYear').value = Math.min(year + 4, 2099);
     setPlace(B.AUCKLAND_BRITOMART);
+    $('ritualText').value = B.DEFAULT_RITUAL;
   }
 
   function readStorage() {
@@ -94,8 +110,11 @@
   function updateRuleInputs() {
     const rule = $('rule').value;
     for (const el of document.querySelectorAll('[data-rule]')) el.hidden = el.dataset.rule !== rule;
+    const customLunar = rule === 'lunar' && $('lunarType').value === 'custom';
+    for (const el of document.querySelectorAll('[data-lunar-custom]')) el.hidden = !customLunar;
     $('lunarHint').textContent = LUNAR_HINTS[$('lunarType').value];
     $('noonMinutes').disabled = !$('noonReminder').checked;
+    $('ritualFields').hidden = !$('includeRitual').checked;
   }
 
   // ---------- 读取输入 ----------
@@ -150,7 +169,9 @@
     const { startYear, endYear } = readYears();
     switch ($('rule').value) {
       case 'lunar':
-        return B.datesByLunarFastDays(startYear, endYear, $('lunarType').value);
+        return $('lunarType').value === 'custom'
+          ? B.datesByLunarDays(startYear, endYear, checkedValues('lunarDay').map(Number))
+          : B.datesByLunarFastDays(startYear, endYear, $('lunarType').value);
       case 'tibetan':
         return B.tibetanObservances(startYear, endYear, {
           monthlyDays: checkedValues('tibetanDay'),
@@ -169,22 +190,45 @@
     }
   }
 
+  /** 当前规则的简短描述，如「六斋日（2026-2030）」 */
+  function describeRule() {
+    const selectedText = (id) => $(id).selectedOptions[0].textContent;
+    const rule = $('rule').value;
+    const text = {
+      lunar: () => ($('lunarType').value === 'custom'
+        ? `农历每月${checkedValues('lunarDay').map((d) => B.LUNAR_DAY_NAMES[d - 1]).join('、')}`
+        : selectedText('lunarType')),
+      tibetan: () => '藏历斋日',
+      monthly: () => `每月 ${$('monthDay').value} 日`,
+      quarter: () => `每季度${selectedText('quarterWhich')}`,
+      weekday: () => `${selectedText('weekdayMonth')}${selectedText('weekdayWhich')}${selectedText('weekdayDay')}`,
+    }[rule]();
+    return `${text}（${$('startYear').value}-${$('endYear').value}）`;
+  }
+
   /** 合并规则日期与手动选择的日期，每个日期附上殊胜日说明 */
   function buildEvents() {
     const includeRule = $('includeRule').checked;
     const includeManual = $('includeManual').checked;
     if (!includeRule && !includeManual) throw new Error('请在「生成内容」中至少勾选一项');
 
-    const dates = [
-      ...(includeRule ? computeRuleDates() : []),
-      ...(includeManual ? [...picked].map(B.parseDateKey) : []),
-    ];
+    let ruleDates = [];
+    if (includeRule) {
+      try {
+        ruleDates = computeRuleDates();
+      } catch (e) {
+        const hint = picked.size ? '如果只想生成已选日期列表，请在「生成内容」中取消勾选「当前快捷规则的日期」，并勾选「已选日期列表」。' : '';
+        throw new Error(`快捷规则：${e.message}。${hint}`);
+      }
+    }
+    const dates = [...ruleDates, ...(includeManual ? [...picked].map(B.parseDateKey) : [])];
     const sorted = B.uniqueSortedDates(dates);
-    if (sorted.length === 0) throw new Error(includeManual && !includeRule ? '还没有在日历上选择日期' : '没有符合规则的日期');
+    if (sorted.length === 0) throw new Error(includeManual && !includeRule ? '已选日期列表是空的' : '当前快捷规则没有日期');
 
     const holyDays = B.holyDaysInRange(sorted[0], sorted.at(-1));
     const notes = new Map(sorted.map((d) => [B.dateKey(d), (holyDays.get(B.dateKey(d)) || []).map((x) => x.text)]));
-    const options = { place: readPlace(), ...readReminders(), notes, showTibetan: true };
+    const ritual = $('includeRitual').checked ? B.fillRitual($('ritualText').value, $('ritualName').value) : '';
+    const options = { place: readPlace(), ...readReminders(), notes, showTibetan: true, ritual };
     return { options, events: sorted.map((date) => B.buildEvent(date, options)) };
   }
 
@@ -215,6 +259,7 @@
   function renderPicked() {
     const keys = [...picked].sort();
     $('pickedCount').textContent = String(keys.length);
+    $('pickedCountLabel').textContent = `（${keys.length} 天）`;
     $('pickedEmpty').hidden = keys.length > 0;
     $('clearPicked').hidden = keys.length === 0;
     if (keys.length === 0) {
@@ -259,11 +304,18 @@
 
   /** 规则变化后重新计算规则日期并在月历上标出；输入不完整时不标 */
   function refreshRuleDates() {
+    const label = $('ruleCountLabel');
+    let keys = new Set();
     try {
-      ruleDateKeys = $('includeRule').checked ? new Set(computeRuleDates().map(B.dateKey)) : new Set();
+      keys = new Set(computeRuleDates().map(B.dateKey));
+      label.textContent = `（${keys.size} 天）`;
+      label.classList.remove('warn');
     } catch (e) {
-      ruleDateKeys = new Set();
+      label.textContent = `（${e.message}）`;
+      label.classList.add('warn');
     }
+    // 只有勾选「当前快捷规则的日期」时才在月历上标出
+    ruleDateKeys = $('includeRule').checked ? keys : new Set();
     calendarView.refresh();
   }
 
@@ -311,7 +363,7 @@
       return tr;
     });
     body.replaceChildren(...rows);
-    $('summary').textContent = `共 ${events.length} 天 · ${options.place.name}（${tz}）`;
+    $('summary').textContent = `共 ${events.length} 天 · ${options.place.name}（${tz}）${options.ritual.trim() ? ' · 附仪轨' : ''}`;
     $('results').hidden = false;
   }
 
@@ -333,16 +385,59 @@
   $('rule').addEventListener('change', updateRuleInputs);
   $('lunarType').addEventListener('change', updateRuleInputs);
   $('noonReminder').addEventListener('change', updateRuleInputs);
+  $('includeRitual').addEventListener('change', updateRuleInputs);
+
+  // 仪轨文字边输入边保存，避免未离开输入框就关闭页面时丢失
+  for (const id of ['ritualName', 'ritualText']) $(id).addEventListener('input', saveSettings);
+  $('resetRitual').addEventListener('click', () => {
+    if ($('ritualText').value !== B.DEFAULT_RITUAL && !window.confirm('确定把仪轨内容恢复为默认文字吗？')) return;
+    $('ritualText').value = B.DEFAULT_RITUAL;
+    saveSettings();
+  });
 
   // 规则或年份变化时更新月历上的规则日期；地点变化时更新详情中的太阳时间
   $('form').addEventListener('change', (event) => {
     if (event.target.closest('#calendar')) return;
+    $('ruleStatus').textContent = '';
     scheduleRefresh();
     saveSettings();
   });
   $('form').addEventListener('input', (event) => {
     if (['startYear', 'endYear', 'monthDay'].includes(event.target.id)) scheduleRefresh();
   });
+
+  /** 把当前规则的日期加入或移出已选列表 */
+  function applyRuleToPicked(add) {
+    $('ruleStatus').textContent = '';
+    run(() => {
+      const keys = computeRuleDates().map(B.dateKey);
+      if (keys.length === 0) throw new Error('当前快捷规则没有日期');
+      let changed = 0;
+      for (const key of keys) {
+        if (add ? !picked.has(key) : picked.has(key)) changed++;
+        if (add) picked.add(key);
+        else picked.delete(key);
+      }
+      renderPicked();
+      calendarView.refresh();
+      const rest = keys.length - changed;
+      const name = describeRule();
+      if (add) {
+        $('ruleStatus').textContent = changed === 0 ? `「${name}」的 ${keys.length} 个日期都已在列表中`
+          : `已将「${name}」的 ${changed} 个日期加入列表${rest ? `（另有 ${rest} 个已在列表中）` : ''}`;
+      } else {
+        $('ruleStatus').textContent = changed === 0 ? `列表中没有「${name}」的日期` : `已从列表移除「${name}」的 ${changed} 个日期`;
+      }
+    });
+  }
+
+  $('lunarDaysNone').addEventListener('click', () => {
+    for (const box of document.querySelectorAll('input[name="lunarDay"]')) box.checked = false;
+    $('form').dispatchEvent(new Event('change'));
+  });
+
+  $('addRuleDates').addEventListener('click', () => applyRuleToPicked(true));
+  $('removeRuleDates').addEventListener('click', () => applyRuleToPicked(false));
 
   $('clearPicked').addEventListener('click', () => {
     if (picked.size > 1 && !window.confirm(`确定清空已选的 ${picked.size} 个日期吗？`)) return;

@@ -1,0 +1,8 @@
+[
+  { "name": "Auckland Britomart Train Station", "latitude": -36.8440526109716, "longitude": 174.7675260738167, "timezone": "Pacific/Auckland" },
+  { "name": "Shanghai", "latitude": 31.2304, "longitude": 121.4737, "timezone": "Asia/Shanghai" },
+  { "name": "London", "latitude": 51.5072, "longitude": -0.1276, "timezone": "Europe/London" },
+  { "name": "New York", "latitude": 40.7128, "longitude": -74.0060, "timezone": "America/New_York" },
+  { "name": "Honolulu", "latitude": 21.3069, "longitude": -157.8583, "timezone": "Pacific/Honolulu" },
+  { "name": "Sydney", "latitude": -33.8688, "longitude": 151.2093, "timezone": "Australia/Sydney" }
+]

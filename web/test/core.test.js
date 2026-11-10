@@ -24,6 +24,40 @@ test('某月的第几个星期几', () => {
   assert.deepEqual(keys(B.datesByWeekdayRule(2026, 2026, 6, 6, 'second')), ['2026-06-14']);
 });
 
+test('朔望斋：每月初一、十五', () => {
+  assert.deepEqual([...B.lunarFastDays('two', 29)].sort((a, b) => a - b), [1, 15]);
+  const dates = B.datesByLunarFastDays(2026, 2026, 'two');
+  assert.ok(dates.every((d) => [1, 15].includes(B.lunarOf(d).day)));
+  assert.ok(keys(dates).includes('2026-02-17') && keys(dates).includes('2026-03-03'));
+  assert.ok(dates.length >= 23 && dates.length <= 26);
+});
+
+test('自定义农历日子：只守初一', () => {
+  const dates = B.datesByLunarDays(2026, 2026, [1]);
+  assert.ok(dates.every((d) => B.lunarOf(d).day === 1));
+  // 2026 年公历内的农历初一：12 或 13 个
+  assert.ok(dates.length >= 12 && dates.length <= 13);
+  assert.ok(keys(dates).includes('2026-02-17'));
+});
+
+test('自定义农历日子：三十在小月取廿九，与朔望斋/六斋日一致', () => {
+  const thirty = B.datesByLunarDays(2026, 2030, [30]);
+  for (const d of thirty) {
+    const lunar = B.lunarOf(d);
+    assert.equal(lunar.day, lunar.monthLength);
+  }
+  // 同时选廿九和三十时，小月只有一天
+  const both = B.datesByLunarDays(2026, 2030, [29, 30]);
+  assert.ok(both.length < thirty.length * 2);
+  assert.deepEqual(keys(B.datesByLunarDays(2026, 2030, [1, 15])), keys(B.datesByLunarFastDays(2026, 2030, 'two')));
+  // 注意：自定义的廿九就是廿九；六斋日在小月会把廿九、三十整体前移为廿八、廿九，两者不同
+});
+
+test('自定义农历日子：非法输入', () => {
+  assert.throws(() => B.datesByLunarDays(2026, 2026, []), /至少勾选/);
+  assert.throws(() => B.datesByLunarDays(2026, 2026, [31]), /1-30/);
+});
+
 test('斋日规则（大月与小月）', () => {
   assert.deepEqual([...B.lunarFastDays('six', 30)].sort((a, b) => a - b), [8, 14, 15, 23, 29, 30]);
   assert.deepEqual([...B.lunarFastDays('six', 29)].sort((a, b) => a - b), [8, 14, 15, 23, 28, 29]);
@@ -181,6 +215,29 @@ test('生成 .ics', () => {
   const unfolded = ics.replace(/\r\n /g, '');
   assert.ok(unfolded.includes('DESCRIPTION:农历: 正月初八\\n日出: 07:00\\n'));
   assert.ok(unfolded.includes('过午不食'));
+});
+
+test('仪轨：填入名字', () => {
+  assert.equal((B.DEFAULT_RITUAL.match(/_{2,}/g) || []).length, 3);
+  const filled = B.fillRitual(B.DEFAULT_RITUAL, ' 妙音 ');
+  assert.ok(!/_{2,}/.test(filled));
+  assert.equal((filled.match(/我名妙音/g) || []).length, 3);
+  assert.equal(B.fillRitual(B.DEFAULT_RITUAL, ''), B.DEFAULT_RITUAL);
+});
+
+test('仪轨：附在事件描述末尾并正确写入 .ics', () => {
+  const ritual = B.fillRitual(B.DEFAULT_RITUAL, '妙音');
+  const e = B.buildEvent(B.ymd(2026, 2, 24), { place, ritual });
+  assert.ok(e.description.endsWith(`————————————\n${ritual}\n`));
+  const without = B.buildEvent(B.ymd(2026, 2, 24), { place });
+  assert.ok(!without.description.includes('八关斋戒仪轨'));
+
+  const ics = B.eventsToIcs([e], '八关斋戒', Date.UTC(2026, 0, 1));
+  for (const line of ics.split('\r\n')) assert.ok(Buffer.byteLength(line, 'utf8') <= 75, line);
+  // 还原折行与转义后与原文一致
+  const desc = ics.replace(/\r\n /g, '').match(/^DESCRIPTION:(.*)$/m)[1]
+    .replace(/\\n/g, '\n').replace(/\\([,;\\])/g, '$1');
+  assert.equal(desc, e.description);
 });
 
 test('不提醒日中', () => {

@@ -24,7 +24,7 @@ AUCKLAND_BRITOMART = Place("Auckland Britomart Train Station", -36.8440526109716
 # 每月的第几个星期几，"last" 表示最后一个
 WEEK_ORDINALS = {'first': 0, 'second': 1, 'third': 2, 'fourth': 3, 'last': -1}
 
-LUNAR_FAST_TYPES = ('six', 'ten')
+LUNAR_FAST_TYPES = ('two', 'six', 'ten')
 
 LUNAR_MONTH_NAMES = ['正月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '冬月', '腊月']
 LUNAR_DAY_NAMES = [
@@ -63,10 +63,13 @@ def lunar_month_length(lunar: LunarDate):
 def lunar_fast_days(fast_type, month_length):
     """返回某个农历月中的斋日
 
+    朔望斋：初一、十五
     六斋日：初八、十四、十五、廿三、廿九、三十（小月为廿八、廿九）
     十斋日：初一、初八、十四、十五、十八、廿三、廿四、廿八、廿九、三十（小月为廿七、廿八、廿九）
     """
     last = month_length
+    if fast_type == 'two':
+        return {1, 15}
     if fast_type == 'six':
         return {8, 14, 15, 23, last - 1, last}
     if fast_type == 'ten':

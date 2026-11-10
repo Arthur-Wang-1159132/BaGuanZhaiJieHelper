@@ -17,7 +17,75 @@
 
     <form id="form" class="panel" novalidate>
       <section class="group">
-        <h2>日期规则</h2>
+        <div class="group-head">
+          <h2>地点</h2>
+          <div class="actions-inline">
+            <button type="button" class="link" id="useLocation">使用当前位置</button>
+            <button type="button" class="link" id="resetLocation">恢复默认</button>
+          </div>
+        </div>
+        <div class="grid">
+          <label class="field span-2">
+            <span>名称</span>
+            <input id="placeName" type="text" autocomplete="off">
+          </label>
+          <label class="field">
+            <span>纬度（南为负）</span>
+            <input id="latitude" type="number" step="any" min="-90" max="90" inputmode="decimal">
+          </label>
+          <label class="field">
+            <span>经度（西为负）</span>
+            <input id="longitude" type="number" step="any" min="-180" max="180" inputmode="decimal">
+          </label>
+          <label class="field span-2">
+            <span>时区（IANA 名称，如 Asia/Shanghai）</span>
+            <input id="timezone" type="text" autocomplete="off" spellcheck="false" list="timezones">
+            <datalist id="timezones"></datalist>
+          </label>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2>提醒</h2>
+        <div class="checks">
+          <span class="checks-label">日出前</span>
+          <label class="check"><input type="checkbox" name="reminder" value="24" checked> 24 小时</label>
+          <label class="check"><input type="checkbox" name="reminder" value="12" checked> 12 小时</label>
+          <label class="check"><input type="checkbox" name="reminder" value="1" checked> 1 小时</label>
+        </div>
+        <div class="checks">
+          <label class="check"><input type="checkbox" id="noonReminder" checked> 日中前（过午不食）</label>
+          <label class="inline-number">
+            提前 <input id="noonMinutes" type="number" min="0" max="240" value="30" inputmode="numeric"> 分钟
+          </label>
+        </div>
+      </section>
+
+      <section class="group">
+        <div class="group-head">
+          <h2>仪轨</h2>
+          <div class="actions-inline">
+            <button type="button" class="link" id="resetRitual">恢复默认</button>
+          </div>
+        </div>
+        <div class="checks">
+          <label class="check"><input type="checkbox" id="includeRitual" checked> 在日历事件中附上仪轨</label>
+        </div>
+        <div class="grid" id="ritualFields">
+          <label class="field">
+            <span>名字（填入「我名___」）</span>
+            <input id="ritualName" type="text" autocomplete="off" placeholder="不填则保留空白">
+          </label>
+          <label class="field span-full">
+            <span>仪轨内容（可修改）</span>
+            <textarea id="ritualText" rows="8" spellcheck="false"></textarea>
+          </label>
+        </div>
+        <p class="hint">仪轨会附在每个事件描述的末尾，在手机日历中打开事件即可阅读。</p>
+      </section>
+
+      <section class="group">
+        <h2>快捷规则</h2>
         <div class="grid">
           <label class="field">
             <span>开始年份</span>
@@ -30,21 +98,29 @@
           <label class="field span-full">
             <span>重复规则</span>
             <select id="rule">
-              <option value="lunar">农历斋日（六斋日 / 十斋日）</option>
               <option value="tibetan">藏历斋日</option>
-              <option value="monthly">每月的第几天</option>
-              <option value="quarter">每季度（第一天或最后一天）</option>
-              <option value="weekday">某月的第几个星期几</option>
+              <option value="lunar">农历斋日（朔望斋 / 六斋日 / 十斋日 / 自定义）</option>
+              <option value="monthly">公历：每月的第几天</option>
+              <option value="quarter">公历：每季度（第一天或最后一天）</option>
+              <option value="weekday">公历：某月的第几个星期几</option>
             </select>
           </label>
 
           <label class="field" data-rule="lunar">
             <span>斋日</span>
             <select id="lunarType">
-              <option value="six">六斋日</option>
+              <option value="two">朔望斋（初一、十五）</option>
+              <option value="six" selected>六斋日</option>
               <option value="ten">十斋日</option>
+              <option value="custom">自定义日子</option>
             </select>
           </label>
+          <fieldset class="span-full lunar-day-grid" data-lunar-custom aria-label="农历日子">
+            <div id="lunarDayGrid" class="day-checks"></div>
+            <div class="actions-inline">
+              <button type="button" class="link" id="lunarDaysNone">全不选</button>
+            </div>
+          </fieldset>
           <p class="hint span-full" data-rule="lunar" id="lunarHint"></p>
 
           <fieldset class="span-full choice-group" data-rule="tibetan">
@@ -95,51 +171,12 @@
             <select id="weekdayDay"></select>
           </label>
         </div>
-      </section>
-
-      <section class="group">
-        <div class="group-head">
-          <h2>地点</h2>
-          <div class="actions-inline">
-            <button type="button" class="link" id="useLocation">使用当前位置</button>
-            <button type="button" class="link" id="resetLocation">恢复默认</button>
-          </div>
+        <div class="rule-actions">
+          <button type="button" class="secondary small" id="addRuleDates">加入已选日期</button>
+          <button type="button" class="link" id="removeRuleDates" title="移除当前规则产生的所有日期，包括同时属于其他规则或手动点选的日期">从已选中移除这些日期</button>
+          <span id="ruleStatus" class="hint" role="status"></span>
         </div>
-        <div class="grid">
-          <label class="field span-2">
-            <span>名称</span>
-            <input id="placeName" type="text" autocomplete="off">
-          </label>
-          <label class="field">
-            <span>纬度（南为负）</span>
-            <input id="latitude" type="number" step="any" min="-90" max="90" inputmode="decimal">
-          </label>
-          <label class="field">
-            <span>经度（西为负）</span>
-            <input id="longitude" type="number" step="any" min="-180" max="180" inputmode="decimal">
-          </label>
-          <label class="field span-2">
-            <span>时区（IANA 名称，如 Asia/Shanghai）</span>
-            <input id="timezone" type="text" autocomplete="off" spellcheck="false" list="timezones">
-            <datalist id="timezones"></datalist>
-          </label>
-        </div>
-      </section>
-
-      <section class="group">
-        <h2>提醒</h2>
-        <div class="checks">
-          <span class="checks-label">日出前</span>
-          <label class="check"><input type="checkbox" name="reminder" value="24" checked> 24 小时</label>
-          <label class="check"><input type="checkbox" name="reminder" value="12" checked> 12 小时</label>
-          <label class="check"><input type="checkbox" name="reminder" value="1" checked> 1 小时</label>
-        </div>
-        <div class="checks">
-          <label class="check"><input type="checkbox" id="noonReminder" checked> 日中前（过午不食）</label>
-          <label class="inline-number">
-            提前 <input id="noonMinutes" type="number" min="0" max="240" value="30" inputmode="numeric"> 分钟
-          </label>
-        </div>
+        <p class="hint">切换规则后可以多次加入，把多种规则合并到下方的「已选日期」列表中。</p>
       </section>
 
       <section class="group">
@@ -152,7 +189,7 @@
           <li><span class="swatch swatch-fast">斋</span>适合受持八关斋戒</li>
           <li><span class="swatch swatch-festival">节</span>佛教节日</li>
           <li><span class="swatch swatch-saga"></span>萨嘎达瓦月</li>
-          <li><span class="swatch swatch-rule"></span>规则日期</li>
+          <li><span class="swatch swatch-rule"></span>快捷规则日期</li>
           <li><span class="swatch swatch-selected"></span>已选</li>
         </ul>
         <div id="dayDetail" class="day-detail" hidden></div>
@@ -167,11 +204,11 @@
 
       <section class="group">
         <h2>生成内容</h2>
+        <p class="hint">两者同时勾选时会合并去重。如果已经把快捷规则加入了列表，只勾选「已选日期列表」即可。每个事件的描述中会写明当天的农历、藏历和殊胜日。</p>
         <div class="checks">
-          <label class="check"><input type="checkbox" id="includeRule" checked> 规则日期</label>
-          <label class="check"><input type="checkbox" id="includeManual" checked> 手动选择的日期</label>
+          <label class="check"><input type="checkbox" id="includeRule" checked> 当前快捷规则的日期 <span id="ruleCountLabel" class="option-count"></span></label>
+          <label class="check"><input type="checkbox" id="includeManual" checked> 已选日期列表 <span id="pickedCountLabel" class="option-count"></span></label>
         </div>
-        <p class="hint">两者同时勾选时会合并去重。每个事件的描述中会写明当天的农历、藏历和殊胜日。</p>
       </section>
 
       <div id="error" class="error" role="alert" hidden></div>

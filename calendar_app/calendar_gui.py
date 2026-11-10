@@ -8,7 +8,7 @@ RULE_MONTHLY = "每月的第几天"
 RULE_QUARTER = "每季度（第一天或最后一天）"
 RULE_WEEKDAY = "某月的第几个星期几"
 
-LUNAR_TYPES = {"六斋日": "six", "十斋日": "ten"}
+LUNAR_TYPES = {"朔望斋（初一、十五）": "two", "六斋日": "six", "十斋日": "ten"}
 QUARTER_DAYS = {"第一天": "first", "最后一天": "last"}
 WEEKDAYS = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
 ORDINAL_LABELS = dict(zip(["第一个", "第二个", "第三个", "第四个", "最后一个"], WEEK_ORDINALS))

@@ -61,6 +61,7 @@ def lunar_reference():
 def rules_reference():
     gen = RecurringSunEventGenerator(2024, 2032)
     return {
+        "lunar_two": [key(d) for d in gen.dates_by_lunar_fast_days('two')],
         "lunar_six": [key(d) for d in gen.dates_by_lunar_fast_days('six')],
         "lunar_ten": [key(d) for d in gen.dates_by_lunar_fast_days('ten')],
         "monthly_31": [key(d) for d in gen.dates_by_monthly_day(31)],

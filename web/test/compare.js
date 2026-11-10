@@ -46,6 +46,7 @@ function report(name, mismatches, total) {
 {
   const keys = (dates) => dates.map(BGZJ.dateKey);
   const js = {
+    lunar_two: keys(BGZJ.datesByLunarFastDays(2024, 2032, 'two')),
     lunar_six: keys(BGZJ.datesByLunarFastDays(2024, 2032, 'six')),
     lunar_ten: keys(BGZJ.datesByLunarFastDays(2024, 2032, 'ten')),
     monthly_31: keys(BGZJ.datesByMonthlyDay(2024, 2032, 31)),

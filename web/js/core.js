@@ -22,7 +22,7 @@ const BGZJ = (() => {
 
   // 每月的第几个星期几，-1 表示最后一个
   const WEEK_ORDINALS = { first: 0, second: 1, third: 2, fourth: 3, last: -1 };
-  const LUNAR_FAST_TYPES = ['six', 'ten'];
+  const LUNAR_FAST_TYPES = ['two', 'six', 'ten'];
   const WEEKDAY_NAMES = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
 
   // ---------- 日期工具 ----------
@@ -324,11 +324,13 @@ const BGZJ = (() => {
 
   /**
    * 某个农历月中的斋日
+   * 朔望斋：初一、十五
    * 六斋日：初八、十四、十五、廿三、廿九、三十（小月为廿八、廿九）
    * 十斋日：初一、初八、十四、十五、十八、廿三、廿四、廿八、廿九、三十（小月为廿七、廿八、廿九）
    */
   function lunarFastDays(fastType, monthLength) {
     const last = monthLength;
+    if (fastType === 'two') return new Set([1, 15]);
     if (fastType === 'six') return new Set([8, 14, 15, 23, last - 1, last]);
     if (fastType === 'ten') return new Set([1, 8, 14, 15, 18, 23, 24, last - 2, last - 1, last]);
     throw new Error(`斋日类型只支持 ${LUNAR_FAST_TYPES.join(', ')}`);
@@ -612,9 +614,42 @@ const BGZJ = (() => {
     return result;
   }
 
+  /**
+   * 农历每月指定的日子（闰月同样计算）
+   * @param {number[]} days 1-30；选 30 时小月（29 天）取廿九
+   */
+  function datesByLunarDays(startYear, endYear, days) {
+    if (!Array.isArray(days) || days.length === 0) throw new Error('请至少勾选一个农历日子');
+    if (!days.every((d) => Number.isInteger(d) && d >= 1 && d <= 30)) throw new Error('农历日子必须在 1-30 之间');
+    const result = [];
+    const end = ymd(years(startYear, endYear).at(-1), 12, 31);
+    for (let date = ymd(startYear, 1, 1); compareDates(date, end) <= 0; date = addDays(date, 1)) {
+      const lunar = lunarOf(date);
+      if (days.some((d) => (d === 30 ? lunar.monthLength : d) === lunar.day)) result.push(date);
+    }
+    return result;
+  }
+
   /** 去重并排序 */
   function uniqueSortedDates(dates) {
     return [...new Set(dates.map(dateKey))].sort().map(parseDateKey);
+  }
+
+  // ---------- 仪轨 ----------
+
+  const DEFAULT_RITUAL = [
+    '八关斋戒仪轨',
+    '于三宝所依处前随力供上供品，脱鞋，五支(两手、足、脸)沐浴，向三宝及上师顶礼，两膝著地、合掌',
+    '发出离心及菩提心。于上师或三宝所依处前诵此文:',
+    '大德一心念我，我名___，从此时起终身皈依佛，两足尊；皈依法，离欲尊；皈依僧，众中尊。请大德从此时起，乃至明日日出时止，摄我为八斋戒者(诵三遍)。 善哉。',
+    '次诵:愿师念我，往昔圣者阿罗汉如何断除杀生而不杀生，如是我名__，亦从此时起，乃至明日日出时止，断除杀生而不杀生，我以此第一支，向圣者阿罗汉之学处随修、随学、随作。此外，往昔圣者阿罗汉如何断除盗取，非梵行，妄语，谷酒、酒粉、能醉、放逸之物，歌舞、音乐、华鬘、涂香、饰件、涂色，高广大床、 非时食而不食非时食。如是我名__，亦从此时起，乃至明日日出时止，不盗，不非梵行，不妄语，不饮谷酒、 酒粉、能醉、放逸之物，不作歌舞、音乐、华鬘、涂香、 装饰、涂色，不坐卧高广大床，不非时食，我以此八支向圣者阿罗汉之学处随修、随学、随作(诵一遍)。',
+    '善哉。',
+  ].join('\n');
+
+  /** 把仪轨中的「我名___」等空白（两个及以上下划线）替换为名字；名字为空时保留原文 */
+  function fillRitual(text, name = '') {
+    const trimmed = name.trim();
+    return trimmed ? text.replace(/_{2,}/g, trimmed) : text;
   }
 
   // ---------- 事件与 .ics ----------
@@ -633,9 +668,10 @@ const BGZJ = (() => {
    * 生成某天的事件数据
    * options.showTibetan: 描述中加入藏历日期
    * options.notes: Map(dateKey -> string[])，写在描述开头（如藏历斋日名称）
+   * options.ritual: 附在描述末尾的仪轨全文（空则不附）
    */
   function buildEvent(date, options) {
-    const { place, reminderHours = [24, 12, 1], noonReminderMinutes = 30, showTibetan = false, notes } = options;
+    const { place, reminderHours = [24, 12, 1], noonReminderMinutes = 30, showTibetan = false, notes, ritual = '' } = options;
     const times = getSunTimes(place, date);
     const fmt = (ms) => formatLocalTime(ms, place.timezone);
     const totalMinutes = Math.trunc((times.nextSunrise - times.sunrise) / 60000);
@@ -651,6 +687,7 @@ const BGZJ = (() => {
       `总时长: ${pad(Math.trunc(totalMinutes / 60))}:${pad(totalMinutes % 60)}`,
       '注：由于不同经纬度以及海拔会导致时间有略微差异, 但几乎都在+-1分钟之内',
       `本次时间使用的是${place.name}（${toDms(place.latitude, 'N', 'S')} ${toDms(place.longitude, 'E', 'W')}）的时间`,
+      ...(ritual.trim() ? ['', '————————————', ritual.trim()] : []),
     ].join('\n') + '\n';
 
     const alarms = reminderHours.map((hours) => ({ hoursBefore: hours, text: summary }));
@@ -732,8 +769,9 @@ const BGZJ = (() => {
     LUNAR_MIN_DATE, LUNAR_MAX_DATE, lunarOf, lunarLabel, lunarFastDays,
     TIBETAN_MONTHLY_DAYS, TIBETAN_FESTIVALS, tibetanOf, tibetanLabel, tibetanObservances,
     HAN_FESTIVALS, holyDaysInRange, isFastDay, lunarShortLabel, tibetanShortLabel, compareDates,
-    datesByMonthlyDay, datesByQuarter, datesByWeekdayRule, datesByLunarFastDays, uniqueSortedDates,
-    toDms, buildEvent, eventsToIcs, foldLine,
+    datesByMonthlyDay, datesByQuarter, datesByWeekdayRule, datesByLunarFastDays, datesByLunarDays, uniqueSortedDates,
+    LUNAR_DAY_NAMES,
+    toDms, buildEvent, eventsToIcs, foldLine, DEFAULT_RITUAL, fillRitual,
   };
 })();
 
