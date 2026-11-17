@@ -675,7 +675,7 @@ const BGZJ = (() => {
     const times = getSunTimes(place, date);
     const fmt = (ms) => formatLocalTime(ms, place.timezone);
     const totalMinutes = Math.trunc((times.nextSunrise - times.sunrise) / 60000);
-    const summary = '太阳时间提醒';
+    const summary = '八关斋戒太阳时间提醒';
     const description = [
       ...(notes?.get(dateKey(date)) || []),
       `农历: ${lunarLabel(lunarOf(date))}`,

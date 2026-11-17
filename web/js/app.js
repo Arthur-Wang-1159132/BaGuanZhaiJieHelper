@@ -449,14 +449,14 @@
 
   $('previewButton').addEventListener('click', () => run(() => renderPreview(buildEvents())));
 
-  $('form').addEventListener('submit', (event) => {
-    event.preventDefault();
-    run(() => {
-      const result = buildEvents();
-      renderPreview(result);
-      download(result);
-    });
-  });
+  $('downloadButton').addEventListener('click', () => run(() => {
+    const result = buildEvents();
+    renderPreview(result);
+    download(result);
+  }));
+
+  // 表单里没有提交按钮，在输入框按回车不会提交；保险起见仍阻止提交，避免刷新页面
+  $('form').addEventListener('submit', (event) => event.preventDefault());
 
   $('resetLocation').addEventListener('click', () => {
     setPlace(B.AUCKLAND_BRITOMART);
