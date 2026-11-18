@@ -16,6 +16,7 @@
 
   const fields = ['rule', 'lunarType', 'monthDay', 'quarterWhich', 'weekdayMonth', 'weekdayWhich', 'weekdayDay',
     'tibetanFestivals', 'tibetanSagaDawa', 'includeRule', 'includeManual', 'includeRitual', 'ritualName', 'ritualText',
+    'includeDedication', 'dedicationText', 'sunriseAlarm', 'endAlarm',
     'startYear', 'endYear', 'placeName', 'latitude', 'longitude', 'timezone', 'noonReminder', 'noonMinutes'];
   // 多选框组：保存为选中值的数组
   const checkboxGroups = ['reminder', 'tibetanDay', 'lunarDay'];
@@ -67,6 +68,7 @@
     $('endYear').value = Math.min(year + 4, 2099);
     setPlace(B.AUCKLAND_BRITOMART);
     $('ritualText').value = B.DEFAULT_RITUAL;
+    $('dedicationText').value = B.DEFAULT_DEDICATION;
   }
 
   function readStorage() {
@@ -82,6 +84,9 @@
     for (const id of fields) data[id] = $(id).type === 'checkbox' ? $(id).checked : $(id).value;
     for (const name of checkboxGroups) data[name] = checkedValues(name);
     data.picked = [...picked];
+    // 仪轨未修改时不保存，以后更新 core.js 中的默认文字，页面会直接使用新文字
+    if (data.ritualText === B.DEFAULT_RITUAL) delete data.ritualText;
+    if (data.dedicationText === B.DEFAULT_DEDICATION) delete data.dedicationText;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) {
@@ -115,6 +120,8 @@
     $('lunarHint').textContent = LUNAR_HINTS[$('lunarType').value];
     $('noonMinutes').disabled = !$('noonReminder').checked;
     $('ritualFields').hidden = !$('includeRitual').checked;
+    $('dedicationFields').hidden = !$('includeDedication').checked;
+    $('ritualNameField').hidden = !$('includeRitual').checked && !$('includeDedication').checked;
   }
 
   // ---------- 读取输入 ----------
@@ -161,7 +168,12 @@
       noonReminderMinutes = intValue('noonMinutes', '日中提醒分钟数');
       if (noonReminderMinutes < 0) throw new Error('日中提醒分钟数不能为负数');
     }
-    return { reminderHours: checkedValues('reminder').map(Number), noonReminderMinutes };
+    return {
+      reminderHours: checkedValues('reminder').map(Number),
+      noonReminderMinutes,
+      sunriseAlarm: $('sunriseAlarm').checked,
+      endAlarm: $('endAlarm').checked,
+    };
   }
 
   /** 按下拉框所选规则计算日期 */
@@ -227,8 +239,10 @@
 
     const holyDays = B.holyDaysInRange(sorted[0], sorted.at(-1));
     const notes = new Map(sorted.map((d) => [B.dateKey(d), (holyDays.get(B.dateKey(d)) || []).map((x) => x.text)]));
-    const ritual = $('includeRitual').checked ? B.fillRitual($('ritualText').value, $('ritualName').value) : '';
-    const options = { place: readPlace(), ...readReminders(), notes, showTibetan: true, ritual };
+    const name = $('ritualName').value;
+    const ritual = $('includeRitual').checked ? B.fillRitual($('ritualText').value, name) : '';
+    const dedication = $('includeDedication').checked ? B.fillRitual($('dedicationText').value, name) : '';
+    const options = { place: readPlace(), ...readReminders(), notes, showTibetan: true, ritual, dedication };
     return { options, events: sorted.map((date) => B.buildEvent(date, options)) };
   }
 
@@ -363,7 +377,7 @@
       return tr;
     });
     body.replaceChildren(...rows);
-    $('summary').textContent = `共 ${events.length} 天 · ${options.place.name}（${tz}）${options.ritual.trim() ? ' · 附仪轨' : ''}`;
+    $('summary').textContent = `共 ${events.length} 天 · ${options.place.name}（${tz}）${options.ritual.trim() ? ' · 附仪轨' : ''}${options.dedication.trim() ? ' · 附回向' : ''}`;
     $('results').hidden = false;
   }
 
@@ -386,12 +400,15 @@
   $('lunarType').addEventListener('change', updateRuleInputs);
   $('noonReminder').addEventListener('change', updateRuleInputs);
   $('includeRitual').addEventListener('change', updateRuleInputs);
+  $('includeDedication').addEventListener('change', updateRuleInputs);
 
   // 仪轨文字边输入边保存，避免未离开输入框就关闭页面时丢失
-  for (const id of ['ritualName', 'ritualText']) $(id).addEventListener('input', saveSettings);
+  for (const id of ['ritualName', 'ritualText', 'dedicationText']) $(id).addEventListener('input', saveSettings);
   $('resetRitual').addEventListener('click', () => {
-    if ($('ritualText').value !== B.DEFAULT_RITUAL && !window.confirm('确定把仪轨内容恢复为默认文字吗？')) return;
+    const modified = $('ritualText').value !== B.DEFAULT_RITUAL || $('dedicationText').value !== B.DEFAULT_DEDICATION;
+    if (modified && !window.confirm('确定把受戒仪轨和回向仪轨都恢复为默认文字吗？')) return;
     $('ritualText').value = B.DEFAULT_RITUAL;
+    $('dedicationText').value = B.DEFAULT_DEDICATION;
     saveSettings();
   });
 

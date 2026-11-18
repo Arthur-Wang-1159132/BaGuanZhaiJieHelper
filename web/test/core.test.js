@@ -230,7 +230,7 @@ test('仪轨：附在事件描述末尾并正确写入 .ics', () => {
   const e = B.buildEvent(B.ymd(2026, 2, 24), { place, ritual });
   assert.ok(e.description.endsWith(`————————————\n${ritual}\n`));
   const without = B.buildEvent(B.ymd(2026, 2, 24), { place });
-  assert.ok(!without.description.includes('八关斋戒仪轨'));
+  assert.ok(!without.description.includes('八关斋戒自受仪轨'));
 
   const ics = B.eventsToIcs([e], '八关斋戒', Date.UTC(2026, 0, 1));
   for (const line of ics.split('\r\n')) assert.ok(Buffer.byteLength(line, 'utf8') <= 75, line);
@@ -238,6 +238,42 @@ test('仪轨：附在事件描述末尾并正确写入 .ics', () => {
   const desc = ics.replace(/\r\n /g, '').match(/^DESCRIPTION:(.*)$/m)[1]
     .replace(/\\n/g, '\n').replace(/\\([,;\\])/g, '$1');
   assert.equal(desc, e.description);
+});
+
+test('回向仪轨：附在受戒仪轨之后，名字同样填入', () => {
+  const ritual = B.fillRitual(B.DEFAULT_RITUAL, '妙音');
+  const dedication = B.fillRitual('回向\n愿我名___功德回向', '妙音');
+  const e = B.buildEvent(B.ymd(2026, 2, 24), { place, ritual, dedication });
+  assert.equal(dedication, '回向\n愿我名妙音功德回向');
+  assert.ok(e.description.endsWith(`————————————\n${ritual}\n\n————————————\n${dedication}\n`));
+  assert.ok(e.description.indexOf(ritual) < e.description.indexOf(dedication));
+  const onlyDedication = B.buildEvent(B.ymd(2026, 2, 24), { place, dedication: B.DEFAULT_DEDICATION });
+  assert.ok(onlyDedication.description.endsWith(`————————————\n${B.DEFAULT_DEDICATION}\n`));
+  assert.ok(!onlyDedication.description.includes('八关斋戒自受仪轨'));
+});
+
+test('日出时与次日日出时提醒', () => {
+  const date = B.ymd(2026, 2, 24);
+  const times = B.getSunTimes(place, date);
+  const e = B.buildEvent(date, { place, reminderHours: [], noonReminderMinutes: null, sunriseAlarm: true, endAlarm: true });
+  assert.deepEqual(e.alarms.map((a) => a.at), [times.sunrise, times.nextSunrise]);
+  const ics = B.eventsToIcs([e], '八关斋戒', Date.UTC(2026, 0, 1));
+  // 都写成相对开始时间（iPhone 不支持固定时间点的提醒）
+  assert.ok(!ics.includes('VALUE=DATE-TIME'));
+  assert.ok(ics.includes('TRIGGER:PT0M'));
+  const total = Math.round((times.nextSunrise - Math.trunc(times.sunrise / 1000) * 1000) / 60000);
+  assert.ok(ics.includes(`TRIGGER:PT${total}M`));
+  // 默认不加
+  assert.equal(B.buildEvent(date, { place }).alarms.length, 4);
+});
+
+test('日中前提醒：开始后若干分钟', () => {
+  const date = B.ymd(2026, 2, 24);
+  const times = B.getSunTimes(place, date);
+  const e = B.buildEvent(date, { place, reminderHours: [], noonReminderMinutes: 30 });
+  const expected = Math.round((times.noon - 30 * 60000 - Math.trunc(times.sunrise / 1000) * 1000) / 60000);
+  assert.equal(e.alarms[0].minutesAfterStart, expected);
+  assert.ok(B.eventsToIcs([e]).includes(`TRIGGER:PT${expected}M`));
 });
 
 test('不提醒日中', () => {

@@ -54,6 +54,10 @@
           <label class="check"><input type="checkbox" name="reminder" value="1" checked> 1 小时</label>
         </div>
         <div class="checks">
+          <label class="check"><input type="checkbox" id="sunriseAlarm" checked> 日出时（受戒开始）</label>
+          <label class="check"><input type="checkbox" id="endAlarm" checked> 次日日出时（圆满、回向）</label>
+        </div>
+        <div class="checks">
           <label class="check"><input type="checkbox" id="noonReminder" checked> 日中前（过午不食）</label>
           <label class="inline-number">
             提前 <input id="noonMinutes" type="number" min="0" max="240" value="30" inputmode="numeric"> 分钟
@@ -69,19 +73,24 @@
           </div>
         </div>
         <div class="checks">
-          <label class="check"><input type="checkbox" id="includeRitual" checked> 在日历事件中附上仪轨</label>
+          <label class="check"><input type="checkbox" id="includeRitual" checked> 附上受戒仪轨</label>
+          <label class="check"><input type="checkbox" id="includeDedication" checked> 附上回向仪轨</label>
         </div>
-        <div class="grid" id="ritualFields">
-          <label class="field">
+        <div class="grid">
+          <label class="field" id="ritualNameField">
             <span>名字（替换「我名___」下划线）</span>
             <input id="ritualName" type="text" autocomplete="off" placeholder="不填则保留空白">
           </label>
-          <label class="field span-full">
-            <span>仪轨内容（可修改）</span>
+          <label class="field span-full" id="ritualFields">
+            <span>受戒仪轨（可修改）</span>
             <textarea id="ritualText" rows="8" spellcheck="false"></textarea>
           </label>
+          <label class="field span-full" id="dedicationFields">
+            <span>回向仪轨（可修改）</span>
+            <textarea id="dedicationText" rows="4" spellcheck="false"></textarea>
+          </label>
         </div>
-        <p class="hint">仪轨会附在每个事件描述的末尾，在手机日历中打开事件即可阅读。</p>
+        <p class="hint">仪轨会按「受戒仪轨 → 回向仪轨」的顺序附在每个事件描述的末尾，在手机日历中打开事件即可阅读。名字会同时填入两段仪轨。</p>
       </section>
 
       <section class="group">
