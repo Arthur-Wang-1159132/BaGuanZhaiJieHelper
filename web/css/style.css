@@ -238,6 +238,27 @@ input[type="checkbox"] {
 
 .inline-number input { width: 72px; }
 
+/* 选择手机：单选按钮显示为一排可点的标签 */
+.device-choice { margin: 12px 0 0; padding: 0; border: none; min-width: 0; }
+.device-choice legend { padding: 0; margin-bottom: 6px; color: var(--muted); font-size: 0.9rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.chip:hover { background: var(--surface-alt); }
+.chip input { position: absolute; opacity: 0; pointer-events: none; }
+.chip:has(input:checked) { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+.chip:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.device-choice .hint { margin: 8px 0 0; }
+
 .actions {
   display: flex;
   gap: 12px;

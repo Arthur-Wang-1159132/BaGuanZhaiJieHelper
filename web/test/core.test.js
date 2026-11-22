@@ -293,3 +293,41 @@ test('非法输入', () => {
   assert.equal(B.isValidTimezone('Mars/Base'), false);
   assert.equal(B.isValidTimezone('Asia/Shanghai'), true);
 });
+
+test('安卓版：主事件提前 1 天提醒 + 过午不食事件（从日中开始，提前 1 小时提醒）', () => {
+  const date = B.ymd(2026, 2, 24);
+  const times = B.getSunTimes(place, date);
+  const ritual = B.fillRitual(B.DEFAULT_RITUAL, '妙音');
+  const [main, noon] = B.buildAndroidEvents(date, { place, ritual, reminderHours: [24, 12, 1], noonReminderMinutes: 30, sunriseAlarm: true, endAlarm: true });
+  assert.equal(main.uid, 'bgzj-20260224@baguanzhaijie');
+  assert.equal(main.begin, times.sunrise);
+  assert.equal(main.end, times.nextSunrise);
+  assert.deepEqual(main.alarms.map((a) => a.hoursBefore), [24]);
+  assert.ok(main.description.includes('我名妙音'));
+  assert.equal(noon.uid, 'bgzj-20260224-noon@baguanzhaijie');
+  assert.equal(noon.begin, times.noon);
+  assert.equal(noon.end, times.noon + 30 * 60000);
+  assert.ok(noon.summary.startsWith('过午不食'));
+
+  const ics = B.eventsToIcs([main, noon], '八关斋戒', Date.UTC(2026, 0, 1));
+  assert.equal(ics.split('BEGIN:VEVENT').length - 1, 2);
+  assert.deepEqual(ics.match(/^TRIGGER.*$/gm), ['TRIGGER:-PT24H', 'TRIGGER:-PT1H']);
+  for (const line of ics.split('\r\n')) assert.ok(Buffer.byteLength(line, 'utf8') <= 75, line);
+});
+
+test('荣耀版：主事件多个提醒写在同一个 VALARM，且没有开始后的提醒', () => {
+  const date = B.ymd(2026, 2, 24);
+  const times = B.getSunTimes(place, date);
+  const opts = { place, reminderHours: [1, 24, 12], noonReminderMinutes: 30, sunriseAlarm: true, endAlarm: true };
+  const [main, noon] = B.buildAndroidEvents(date, opts, 'honor');
+  assert.deepEqual(main.alarms, [{ text: main.summary, triggers: ['-PT24H', '-PT12H', '-PT1H', 'PT0M'] }]);
+  assert.equal(noon.begin, times.noon);
+  const ics = B.eventsToIcs([main, noon], '八关斋戒', Date.UTC(2026, 0, 1));
+  assert.equal(ics.split('BEGIN:VALARM').length - 1, 2);
+  assert.deepEqual(ics.match(/^TRIGGER.*$/gm), ['TRIGGER:-PT24H', 'TRIGGER:-PT12H', 'TRIGGER:-PT1H', 'TRIGGER:PT0M', 'TRIGGER:-PT1H']);
+  // 开始后的提醒会被荣耀当成提前提醒，不能出现
+  assert.ok(!/TRIGGER:PT[1-9]/.test(ics));
+  // 不勾选任何提醒时主事件没有提醒
+  const [bare] = B.buildAndroidEvents(date, { place, reminderHours: [], sunriseAlarm: false }, 'honor');
+  assert.equal(bare.alarms.length, 0);
+});

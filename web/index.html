@@ -46,7 +46,7 @@
       </section>
 
       <section class="group">
-        <h2>提醒</h2>
+        <h2>提醒 仅iOS,三星等非谷歌日历</h2>
         <div class="checks">
           <span class="checks-label">日出前</span>
           <label class="check"><input type="checkbox" name="reminder" value="24" checked> 24 小时</label>
@@ -86,7 +86,7 @@
             <textarea id="ritualText" rows="8" spellcheck="false"></textarea>
           </label>
           <label class="field span-full" id="dedicationFields">
-            <span>回向仪轨（可修改）</span>
+            <span>回向仪轨（可修改）仅安卓</span>
             <textarea id="dedicationText" rows="4" spellcheck="false"></textarea>
           </label>
         </div>
@@ -218,6 +218,17 @@
           <label class="check"><input type="checkbox" id="includeRule" checked> 当前快捷规则的日期 <span id="ruleCountLabel" class="option-count"></span></label>
           <label class="check"><input type="checkbox" id="includeManual" checked> 已选日期列表 <span id="pickedCountLabel" class="option-count"></span></label>
         </div>
+        <fieldset class="device-choice">
+          <legend>导入到</legend>
+          <div class="chips">
+            <label class="chip"><input type="radio" name="device" value="ios"> iPhone</label>
+            <label class="chip"><input type="radio" name="device" value="samsung"> 三星</label>
+            <label class="chip"><input type="radio" name="device" value="honor"> 荣耀</label>
+            <label class="chip"><input type="radio" name="device" value="huawei"> 华为</label>
+            <label class="chip"><input type="radio" name="device" value="android"> 其他安卓 / 谷歌日历</label>
+          </div>
+          <p id="deviceHint" class="hint"></p>
+        </fieldset>
       </section>
 
       <div id="error" class="error" role="alert" hidden></div>
@@ -226,6 +237,7 @@
         <button type="button" class="secondary" id="previewButton">预览日期</button>
         <button type="button" class="primary" id="downloadButton">下载 .ics 日历</button>
       </div>
+      <p id="wechatHint" class="error" hidden>微信内置浏览器无法下载日历文件，请点右上角「⋯」，选择「在浏览器中打开」。</p>
     </form>
 
     <section id="results" class="panel results" hidden aria-live="polite">

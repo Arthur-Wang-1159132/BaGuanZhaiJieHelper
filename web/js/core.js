@@ -771,6 +771,41 @@ const BGZJ = (() => {
     };
   }
 
+  /**
+   * 安卓版：每天两个事件，都只用「开始前 / 开始时」的提醒
+   *   主事件：日出 → 次日日出；
+   *   「过午不食」小事件：日中 → 日中后 30 分钟，提前 1 小时提醒（手机上显示「提前 1 小时」，在日中前 1 小时响）。
+   * variant:
+   *   'android'（其他安卓 / 谷歌日历，默认）：每个事件只放一个提醒，主事件提前 1 天，完全符合标准；
+   *   'honor'（荣耀）：主事件按页面设置放日出前 N 小时和日出时提醒，写在同一个 VALARM 的多个 TRIGGER 里。
+   *     这不符合 RFC 5545（一个 VALARM 只能有一个 TRIGGER），但荣耀只认这种写法：
+   *     多个 VALARM 时它只保留最后一个；开始后的提醒（如 PT30M）会被当成提前 30 分钟，所以不能写。
+   */
+  function buildAndroidEvents(date, options, variant = 'android') {
+    const { place, reminderHours = [24, 12, 1], sunriseAlarm = false } = options;
+    const main = buildEvent(date, {
+      ...options, reminderHours: [], noonReminderMinutes: null, sunriseAlarm: false, endAlarm: false,
+    });
+    if (variant === 'honor') {
+      const triggers = [...reminderHours].sort((a, b) => b - a).map((h) => `-PT${h}H`);
+      if (sunriseAlarm) triggers.push('PT0M');
+      main.alarms = triggers.length ? [{ text: main.summary, triggers }] : [];
+    } else {
+      main.alarms = [{ text: main.summary, hoursBefore: 24 }];
+    }
+    const noon = main.times.noon;
+    const text = `日中 ${formatLocalTime(noon, place.timezone)}，过午不食`;
+    const noonEvent = {
+      uid: `bgzj-${date.y}${pad(date.m)}${pad(date.d)}-noon@baguanzhaijie`,
+      date,
+      summary: `过午不食 · 日中 ${formatLocalTime(noon, place.timezone)}`,
+      description: `${text}，请在日中之前用餐。\n农历: ${lunarLabel(lunarOf(date))}\n`,
+      alarms: [{ text, hoursBefore: 1 }],
+      begin: noon, end: noon + 30 * 60000, times: main.times,
+    };
+    return [main, noonEvent];
+  }
+
   const icsDateTime = (ms) => new Date(Math.trunc(ms / 1000) * 1000).toISOString().replace(/[-:]/g, '').replace('.000', '');
 
   function icsEscape(text) {
@@ -822,7 +857,8 @@ const BGZJ = (() => {
           'BEGIN:VALARM',
           'ACTION:DISPLAY',
           `DESCRIPTION:${icsEscape(a.text)}`,
-          a.hoursBefore !== undefined ? `TRIGGER:-PT${a.hoursBefore}H` : `TRIGGER:PT${a.minutesAfterStart}M`,
+          ...(a.triggers ? a.triggers.map((t) => `TRIGGER:${t}`)
+            : [a.hoursBefore !== undefined ? `TRIGGER:-PT${a.hoursBefore}H` : `TRIGGER:PT${a.minutesAfterStart}M`]),
           'END:VALARM',
         );
       }
@@ -841,7 +877,7 @@ const BGZJ = (() => {
     HAN_FESTIVALS, holyDaysInRange, isFastDay, lunarShortLabel, tibetanShortLabel, compareDates,
     datesByMonthlyDay, datesByQuarter, datesByWeekdayRule, datesByLunarFastDays, datesByLunarDays, uniqueSortedDates,
     LUNAR_DAY_NAMES,
-    toDms, buildEvent, eventsToIcs, foldLine, DEFAULT_RITUAL, DEFAULT_DEDICATION, fillRitual,
+    toDms, buildEvent, buildAndroidEvents, eventsToIcs, foldLine, DEFAULT_RITUAL, DEFAULT_DEDICATION, fillRitual,
   };
 })();
 

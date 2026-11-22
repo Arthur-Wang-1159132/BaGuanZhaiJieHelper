@@ -19,7 +19,7 @@
     'includeDedication', 'dedicationText', 'sunriseAlarm', 'endAlarm',
     'startYear', 'endYear', 'placeName', 'latitude', 'longitude', 'timezone', 'noonReminder', 'noonMinutes'];
   // 多选框组：保存为选中值的数组
-  const checkboxGroups = ['reminder', 'tibetanDay', 'lunarDay'];
+  const checkboxGroups = ['reminder', 'tibetanDay', 'lunarDay', 'device'];
   const checkedValues = (name) => [...document.querySelectorAll(`input[name="${name}"]:checked`)].map((x) => x.value);
 
   /** 在月历上手动选择的日期（dateKey） */
@@ -243,7 +243,7 @@
     const ritual = $('includeRitual').checked ? B.fillRitual($('ritualText').value, name) : '';
     const dedication = $('includeDedication').checked ? B.fillRitual($('dedicationText').value, name) : '';
     const options = { place: readPlace(), ...readReminders(), notes, showTibetan: true, ritual, dedication };
-    return { options, events: sorted.map((date) => B.buildEvent(date, options)) };
+    return { options, dates: sorted, events: sorted.map((date) => B.buildEvent(date, options)) };
   }
 
   // ---------- 月历与已选列表 ----------
@@ -381,13 +381,13 @@
     $('results').hidden = false;
   }
 
-  function download({ events }) {
+  function download(events, suffix = '') {
     const ics = B.eventsToIcs(events);
     const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `bgzj_${B.dateKey(events[0].date)}_${B.dateKey(events.at(-1).date)}.ics`;
+    a.download = `bgzj${suffix}_${B.dateKey(events[0].date)}_${B.dateKey(events.at(-1).date)}.ics`;
     document.body.append(a);
     a.click();
     a.remove();
@@ -466,11 +466,59 @@
 
   $('previewButton').addEventListener('click', () => run(() => renderPreview(buildEvents())));
 
+  /**
+   * 导入到哪种手机。各家日历对提醒的支持不同（见 README「下载」一节的实测结果）：
+   *   variant null：所有提醒在同一个事件里（含事件开始后的日中、次日日出提醒）
+   *   'honor'：主事件 + 过午不食事件，主事件多个提醒写在同一个 VALARM 里
+   *   'android'：主事件 + 过午不食事件，每个事件一个提醒
+   */
+  const DEVICES = {
+    ios: { variant: null, name: 'iPhone', desc: '每天一个事件，所有提醒都按上方「提醒」中的设置。' },
+    samsung: { variant: null, name: '三星', desc: '每天一个事件，所有提醒都按上方「提醒」中的设置。' },
+    honor: { variant: 'honor', name: '荣耀', desc: '每天两个事件：主事件（日出到次日日出，按上方设置在日出前和日出时提醒）和「过午不食」（从日中开始，提前 1 小时提醒）。荣耀日历不支持事件开始后的提醒，因此不含次日日出提醒。' },
+    huawei: { variant: 'honor', name: '华为', desc: '每天两个事件：主事件（日出到次日日出，按上方设置在日出前和日出时提醒）和「过午不食」（从日中开始，提前 1 小时提醒）。华为日历不支持事件开始后的提醒，因此不含次日日出提醒。' },
+    android: { variant: 'android', name: '其他安卓', desc: '每天两个事件，每个事件一个提醒：主事件提前 1 天，「过午不食」提前 1 小时。谷歌日历导入时会丢掉文件里的提醒，需要在谷歌日历中自行设置通知。' },
+  };
+  let detectedDevice = null;
+
+  /** 从浏览器标识判断设备；新版 Chrome 会隐藏手机型号，很多安卓手机看不出品牌 */
+  function detectDevice() {
+    const ua = navigator.userAgent;
+    if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'ios';
+    if (!/Android/.test(ua)) return null;
+    if (/HONOR/i.test(ua)) return 'honor';
+    if (/HUAWEI|HuaweiBrowser/i.test(ua)) return 'huawei';
+    if (/SamsungBrowser|SM-[A-Z]\d/.test(ua)) return 'samsung';
+    return null;
+  }
+
+  function updateDeviceHint() {
+    const device = checkedValues('device')[0];
+    $('deviceHint').textContent = device
+      ? `${DEVICES[device].desc}${device === detectedDevice ? '（已根据你的设备自动选择）' : ''}`
+      : '请选择要导入日历的手机。';
+  }
+
+  /** 首次打开（没有保存过选择）时按设备自动选择；微信内置浏览器无法下载文件，提示改用浏览器 */
+  function initDevice() {
+    $('wechatHint').hidden = !/MicroMessenger/i.test(navigator.userAgent);
+    detectedDevice = detectDevice();
+    if (!checkedValues('device').length && detectedDevice) {
+      document.querySelector(`input[name="device"][value="${detectedDevice}"]`).checked = true;
+    }
+    updateDeviceHint();
+  }
+
   $('downloadButton').addEventListener('click', () => run(() => {
+    const device = checkedValues('device')[0];
+    if (!device) throw new Error('请先在「生成内容」中选择要导入日历的手机');
     const result = buildEvents();
     renderPreview(result);
-    download(result);
+    const { variant } = DEVICES[device];
+    const events = variant ? result.dates.flatMap((date) => B.buildAndroidEvents(date, result.options, variant)) : result.events;
+    download(events, `_${device}`);
   }));
+  for (const box of document.querySelectorAll('input[name="device"]')) box.addEventListener('change', updateDeviceHint);
 
   // 表单里没有提交按钮，在输入框按回车不会提交；保险起见仍阻止提交，避免刷新页面
   $('form').addEventListener('submit', (event) => event.preventDefault());
@@ -504,6 +552,7 @@
   });
 
   restoreSettings();
+  initDevice();
   updateRuleInputs();
   renderPicked();
   refreshRuleDates();
